@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goblin Snatchers</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        #startScreen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #000;
+            color: #0f0;
+            text-align: center;
+        }
+        
+        #title {
+            font-size: 8px;
+            line-height: 8px;
+            margin-bottom: 40px;
+            white-space: pre;
+        }
+        
+        #prompt {
+            font-size: 24px;
+            margin-bottom: 20px;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        #gameContainer {
+            display: none;
+            flex: 1;
+            padding: 5px;
+            gap: 10px;
+        }
+        
+        #screen {
+            font-size: 1.5px;
+            line-height: 1.5px;
+            white-space: pre;
+            background: #000;
+            border: 2px solid #0f0;
+            padding: 2px;
+            flex: 1;
+            height: calc(100vh - 120px);
+            width: 100%;
+            overflow: hidden;
+            font-weight: normal;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #minimap {
+            width: 200px;
+            font-size: 6px;
+            line-height: 6px;
+            white-space: pre;
+            background: #001100;
+            border: 2px solid #0f0;
+            padding: 5px;
+            height: 200px;
+            overflow: hidden;
+        }
+        
+        #hud {
+            background: #002200;
+            border-top: 2px solid #0f0;
+            padding: 10px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        
+        #healthBar {
+            width: 300px;
+            height: 20px;
+            border: 2px solid #0f0;
+            background: #000;
+            position: relative;
+        }
+        
+        #healthFill {
+            height: 100%;
+            background: #0f0;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #healthText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        #ammoDisplay {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 80px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #0f0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <div id="title"></div>
+        <div id="prompt">Press Y to Play, N to Exit</div>
+    </div>
+
+    <div id="gameContainer">
+        <div id="screen"></div>
+        <div id="minimap"></div>
+    </div>
+    
+    <div id="hud" style="display: none;">
+        <div id="healthBar">
+            <div id="healthFill"></div>
+            <div id="healthText">100%</div>
+        </div>
+        <div id="ammoDisplay">AMMO: <span id="ammo">10/10</span></div>
+        <div>ENEMIES: <span id="enemies">10</span></div>
+        <div id="reloadText" style="color: #f00; font-weight: bold;"></div>
+    </div>
+    
+    <div id="controls" style="display: none;">
+        WASD: Move | ARROWS: Look | SPACE: Shoot | R: Reload
+    </div>
+
+    <script>
+        class StartScreen {
+            constructor() {
+                this.setupTitle();
+                this.setupInput();
+            }
+            
+            setupTitle() {
+                const title = `
+ ██████╗  ██████╗ ██████╗ ██╗     ██╗███╗   ██╗
+██╔════╝ ██╔═══██╗██╔══██╗██║     ██║████╗  ██║
+██║  ███╗██║   ██║██████╔╝██║     ██║██╔██╗ ██║
+██║   ██║██║   ██║██╔══██╗██║     ██║██║╚██╗██║
+╚██████╔╝╚██████╔╝██████╔╝███████╗██║██║ ╚████║
+ ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝╚═╝╚═╝  ╚═══╝
+
+███████╗███╗   ██╗ █████╗ ████████╗ ██████╗██╗  ██╗███████╗██████╗ ███████╗
+██╔════╝████╗  ██║██╔══██╗╚══██╔══╝██╔════╝██║  ██║██╔════╝██╔══██╗██╔════╝
+███████╗██╔██╗ ██║███████║   ██║   ██║     ███████║█████╗  ██████╔╝███████╗
+╚════██║██║╚██╗██║██╔══██║   ██║   ██║     ██╔══██║██╔══╝  ██╔══██╗╚════██║
+███████║██║ ╚████║██║  ██║   ██║   ╚██████╗██║  ██║███████╗██║  ██║███████║
+╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
+`;
+                document.getElementById('title').textContent = title;
+            }
+            
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'KeyY') {
+                        this.startGame();
+                    } else if (e.code === 'KeyN') {
+                        window.close();
+                    }
+                });
+            }
+            
+            startGame() {
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('gameContainer').style.display = 'flex';
+                document.getElementById('hud').style.display = 'flex';
+                document.getElementById('controls').style.display = 'block';
+                new Game();
+            }
+        }
+
+        class Game {
+            constructor() {
+                // Much larger resolution for wider field of view
+                const availableWidth = window.innerWidth - 230; // Account for minimap and padding
+                const availableHeight = window.innerHeight - 120; // Account for HUD
+                
+                // Increased resolution for much wider field of view
+                this.screenWidth = Math.floor(availableWidth / 1.5); // Increased from /2 to /1.5
+                this.screenHeight = Math.floor(availableHeight / 1.5); // Increased from /2 to /1.5
+                this.mapWidth = 16;
+                this.mapHeight = 16;
+                
+                // Player position and angle
+                this.playerX = 8.0;
+                this.playerY = 8.0;
+                this.playerAngle = 0.0;
+                
+                // Game state
+                this.health = 100;
+                this.maxHealth = 100;
+                this.ammo = 10;
+                this.maxAmmo = 10;
+                this.isReloading = false;
+                this.reloadTime = 0;
+                this.reloadDuration = 2.0;
+                this.enemies = [];
+                this.lastDamageTime = 0;
+                
+                // Gun animation
+                this.gunKick = 0;
+                this.gunKickDecay = 0.85;
+                this.muzzleFlash = 0;
+                
+                // Map
+                this.map = [
+                    "################",
+                    "#..............#",
+                    "#.......########",
+                    "#..............#",
+                    "#......##......#",
+                    "#......##......#",
+                    "#..............#",
+                    "###............#",
+                    "##.............#",
+                    "#......####....#",
+                    "#......#..#....#",
+                    "#......#..#....#",
+                    "#..............#",
+                    "#......########",
+                    "#..............#",
+                    "################"
+                ];
+                
+                // Goblin sprites
+                this.goblinSprites = {
+                    close: [
+                        "    ████████████████████    ",
+                        "  ██████████████████████████  ",
+                        " ████████████████████████████ ",
+                        "██████▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀███████",
+                        "█████▀ ░░░░░░░░░░░░░░ ▀██████",
+                        "████▀ ░░██████░░██████░░ ▀████",
+                        "███▀ ░░░██████░░██████░░░ ▀███",
+                        "██▀ ░░░░░░░░░░░░░░░░░░░░░░ ▀██",
+                        "██ ░░░ ████ ░░░░ ████ ░░░░ ██",
+                        "█ ░░░░ ████ ░░░░ ████ ░░░░░ █",
+                        "█ ░░░░░░░░░▲▲▲▲▲░░░░░░░░░░░ █",
+                        "█ ░░░░░░ ▀▀▀▀▀▀▀ ░░░░░░░░░ █",
+                        "█ ░░░ ▄████████████▄ ░░░░░ █",
+                        "██ ░▄██████████████████▄ ░ ██",
+                        "██▄███▀▀▀▀▀▀▀▀▀▀▀▀▀███▄███",
+                        "████▀ ░░░░░░░░░░░░░ ▀████",
+                        "███ ░░░░░░░░░░░░░░░░░ ███",
+                        "██ ░░░████████████░░░░ ██",
+                        "█ ░░███████████████░░░░ █",
+                        "█ ░████████████████████░ █",
+                        "█████████████████████████",
+                        "▀███▀▀███████████▀▀███▀",
+                        " ▀█▀ ███████████████ ▀█▀ ",
+                        "  ▀ █████████████████ ▀  "
+                    ],
+                    medium: [
+                        "  ████████████████  ",
+                        " ██████████████████ ",
+                        "████▀▀▀▀▀▀▀▀▀▀▀████",
+                        "██▀ ░░░░░░░░░░░ ▀██",
+                        "█▀ ░██░░░░░░██░ ▀█",
+                        "█ ░░██░░░░░░██░░ █",
+                        "█ ░░░░░░░░░░░░░░ █",
+                        "█ ░ ██ ░░ ██ ░░ █",
+                        "█ ░░░░▲▲▲▲▲░░░░ █",
+                        "█ ░░ ▀▀▀▀▀▀▀ ░░ █",
+                        "█ ▄███████████▄ █",
+                        "████▀▀▀▀▀▀▀████",
+                        "██ ░░░░░░░░░ ██",
+                        "█ ░░████████░░ █",
+                        "█████████████████",
+                        "▀██▀▀█████▀▀██▀",
+                        " ▀ ████████ ▀ "
+                    ],
+                    far: [
+                        " ████████████ ",
+                        "███▀▀▀▀▀▀▀███",
+                        "█▀ ░░░░░░░ ▀█",
+                        "█ ░██░░██░ █",
+                        "█ ░░░░░░░░ █",
+                        "█ ░█░░█░░░ █",
+                        "█ ░▲▲▲▲░░░ █",
+                        "█ ▀▀▀▀▀▀░░ █",
+                        "████████████",
+                        "██ ░░░░░ ██",
+                        "█ ░████░░ █",
+                        "███████████",
+                        "▀█▀███▀█▀",
+                        " ████████ "
+                    ]
+                };
+                
+                // Initialize enemies
+                this.initEnemies();
+                
+                // Input handling
+                this.keys = {};
+                this.setupInput();
+                
+                // Start game loop
+                this.gameLoop();
+            }
+            
+            initEnemies() {
+                this.enemies = [
+                    { x: 3, y: 3, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 12, y: 5, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 6, y: 10, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 13, y: 13, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 2, y: 14, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 14, y: 2, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 1, y: 6, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 10, y: 3, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 4, y: 12, health: 100, alive: true, hitbox: 1.2, speed: 0.5 },
+                    { x: 14, y: 8, health: 100, alive: true, hitbox: 1.2, speed: 0.5 }
+                ];
+            }
+            
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+            }
+            
+            update(deltaTime) {
+                const moveSpeed = 5.0 * deltaTime;
+                const rotSpeed = 3.0 * deltaTime;
+                
+                // Update gun animations
+                this.gunKick *= this.gunKickDecay;
+                this.muzzleFlash = Math.max(0, this.muzzleFlash - deltaTime * 5);
+                
+                // Handle reloading
+                if (this.isReloading) {
+                    this.reloadTime += deltaTime;
+                    if (this.reloadTime >= this.reloadDuration) {
+                        this.ammo = this.maxAmmo;
+                        this.isReloading = false;
+                        this.reloadTime = 0;
+                    }
+                }
+                
+                // Rotation
+                if (this.keys['ArrowLeft']) {
+                    this.playerAngle -= rotSpeed;
+                }
+                if (this.keys['ArrowRight']) {
+                    this.playerAngle += rotSpeed;
+                }
+                
+                // Movement
+                let newX = this.playerX;
+                let newY = this.playerY;
+                
+                if (this.keys['KeyW']) {
+                    newX += Math.cos(this.playerAngle) * moveSpeed;
+                    newY += Math.sin(this.playerAngle) * moveSpeed;
+                }
+                if (this.keys['KeyS']) {
+                    newX -= Math.cos(this.playerAngle) * moveSpeed;
+                    newY -= Math.sin(this.playerAngle) * moveSpeed;
+                }
+                if (this.keys['KeyA']) {
+                    newX += Math.cos(this.playerAngle - Math.PI/2) * moveSpeed;
+                    newY += Math.sin(this.playerAngle - Math.PI/2) * moveSpeed;
+                }
+                if (this.keys['KeyD']) {
+                    newX += Math.cos(this.playerAngle + Math.PI/2) * moveSpeed;
+                    newY += Math.sin(this.playerAngle + Math.PI/2) * moveSpeed;
+                }
+                
+                // Collision detection
+                if (this.map[Math.floor(newY)][Math.floor(newX)] !== '#') {
+                    this.playerX = newX;
+                    this.playerY = newY;
+                }
+                
+                // Shooting
+                if (this.keys['Space'] && this.ammo > 0 && !this.isReloading) {
+                    this.shoot();
+                    this.keys['Space'] = false;
+                }
+                
+                // Reloading
+                if (this.keys['KeyR'] && !this.isReloading && this.ammo < this.maxAmmo) {
+                    this.startReload();
+                    this.keys['KeyR'] = false;
+                }
+                
+                // Update enemies
+                this.updateEnemies(deltaTime);
+                
+                // Check collision with enemies
+                this.checkEnemyCollisions(deltaTime);
+            }
+            
+            updateEnemies(deltaTime) {
+                for (let enemy of this.enemies) {
+                    if (enemy.alive) {
+                        const dx = this.playerX - enemy.x;
+                        const dy = this.playerY - enemy.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > 0.5) {
+                            const moveX = (dx / distance) * enemy.speed * deltaTime;
+                            const moveY = (dy / distance) * enemy.speed * deltaTime;
+                            
+                            const newX = enemy.x + moveX;
+                            const newY = enemy.y + moveY;
+                            
+                            if (this.map[Math.floor(newY)][Math.floor(newX)] !== '#') {
+                                enemy.x = newX;
+                                enemy.y = newY;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            checkEnemyCollisions(deltaTime) {
+                const now = Date.now();
+                if (now - this.lastDamageTime < 1000) return;
+                
+                for (let enemy of this.enemies) {
+                    if (enemy.alive) {
+                        const dx = this.playerX - enemy.x;
+                        const dy = this.playerY - enemy.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 0.8) {
+                            this.health = Math.max(0, this.health - 10);
+                            this.lastDamageTime = now;
+                            this.updateHealthBar();
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            startReload() {
+                this.isReloading = true;
+                this.reloadTime = 0;
+                this.gunKick = 2;
+            }
+            
+            shoot() {
+                this.ammo--;
+                this.gunKick = 4;
+                this.muzzleFlash = 1.0;
+                
+                const rayAngle = this.playerAngle;
+                let rayX = this.playerX;
+                let rayY = this.playerY;
+                
+                for (let i = 0; i < 20; i += 0.1) {
+                    rayX += Math.cos(rayAngle) * 0.1;
+                    rayY += Math.sin(rayAngle) * 0.1;
+                    
+                    for (let enemy of this.enemies) {
+                        if (enemy.alive) {
+                            const dx = rayX - enemy.x;
+                            const dy = rayY - enemy.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < enemy.hitbox) {
+                                enemy.health -= 50;
+                                if (enemy.health <= 0) {
+                                    enemy.alive = false;
+                                }
+                                return;
+                            }
+                        }
+                    }
+                    
+                    if (this.map[Math.floor(rayY)][Math.floor(rayX)] === '#') {
+                        break;
+                    }
+                }
+            }
+            
+            raycast() {
+                let screen = Array(this.screenHeight).fill().map(() => Array(this.screenWidth).fill(' '));
+                
+                for (let x = 0; x < this.screenWidth; x++) {
+                    // Slightly wider field of view to take advantage of larger screen
+                    const rayAngle = (this.playerAngle - Math.PI/5) + (x / this.screenWidth) * (Math.PI * 2/5);
+                    
+                    let distanceToWall = 0.0;
+                    let hitWall = false;
+                    let boundary = false;
+                    
+                    const rayX = Math.cos(rayAngle);
+                    const rayY = Math.sin(rayAngle);
+                    
+                    while (!hitWall && distanceToWall < 16.0) {
+                        distanceToWall += 0.1;
+                        
+                        const testX = Math.floor(this.playerX + rayX * distanceToWall);
+                        const testY = Math.floor(this.playerY + rayY * distanceToWall);
+                        
+                        if (testX < 0 || testX >= this.mapWidth || testY < 0 || testY >= this.mapHeight) {
+                            hitWall = true;
+                            distanceToWall = 16.0;
+                        } else if (this.map[testY][testX] === '#') {
+                            hitWall = true;
+                            
+                            const blockMidX = testX + 0.5;
+                            const blockMidY = testY + 0.5;
+                            const testPointX = this.playerX + rayX * distanceToWall;
+                            const testPointY = this.playerY + rayY * distanceToWall;
+                            
+                            if ((testPointX < blockMidX && this.map[testY][testX - 1] === '.') ||
+                                (testPointX >= blockMidX && this.map[testY][testX + 1] === '.') ||
+                                (testPointY < blockMidY && this.map[testY - 1] && this.map[testY - 1][testX] === '.') ||
+                                (testPointY >= blockMidY && this.map[testY + 1] && this.map[testY + 1][testX] === '.')) {
+                                boundary = true;
+                            }
+                        }
+                    }
+                    
+                    const ceiling = Math.floor(this.screenHeight / 2.0 - this.screenHeight / distanceToWall);
+                    const floor = this.screenHeight - ceiling;
+                    
+                    let wallShade;
+                    if (distanceToWall <= 1.0) wallShade = boundary ? '║' : '█';
+                    else if (distanceToWall < 2.0) wallShade = boundary ? '║' : '▓';
+                    else if (distanceToWall < 3.5) wallShade = boundary ? '│' : '▒';
+                    else if (distanceToWall < 5.5) wallShade = boundary ? '│' : '░';
+                    else if (distanceToWall < 8.0) wallShade = boundary ? '┃' : '▫';
+                    else wallShade = ' ';
+                    
+                    for (let y = 0; y < this.screenHeight; y++) {
+                        if (y <= ceiling) {
+                            screen[y][x] = ' ';
+                        } else if (y > ceiling && y <= floor) {
+                            screen[y][x] = wallShade;
+                        } else {
+                            const floorDistance = 1.0 - ((y - this.screenHeight/2.0) / (this.screenHeight/2.0));
+                            if (floorDistance < 0.05) screen[y][x] = '▓';
+                            else if (floorDistance < 0.15) screen[y][x] = '▒';
+                            else if (floorDistance < 0.3) screen[y][x] = '░';
+                            else if (floorDistance < 0.5) screen[y][x] = '·';
+                            else if (floorDistance < 0.7) screen[y][x] = '.';
+                            else if (floorDistance < 0.85) screen[y][x] = '-';
+                            else screen[y][x] = ' ';
+                        }
+                    }
+                }
+                
+                // Draw goblins
+                for (let enemy of this.enemies) {
+                    if (enemy.alive) {
+                        const enemyDistance = Math.sqrt((enemy.x - this.playerX) ** 2 + (enemy.y - this.playerY) ** 2);
+                        const enemyAngle = Math.atan2(enemy.y - this.playerY, enemy.x - this.playerX) - this.playerAngle;
+                        
+                        let normalizedAngle = enemyAngle;
+                        while (normalizedAngle > Math.PI) normalizedAngle -= 2 * Math.PI;
+                        while (normalizedAngle < -Math.PI) normalizedAngle += 2 * Math.PI;
+                        
+                        if (Math.abs(normalizedAngle) < Math.PI/5 && enemyDistance < 16.0) {
+                            let sprite;
+                            if (enemyDistance < 4) sprite = this.goblinSprites.close;
+                            else if (enemyDistance < 8) sprite = this.goblinSprites.medium;
+                            else sprite = this.goblinSprites.far;
+                            
+                            const enemyScreenX = Math.floor((normalizedAngle + Math.PI/5) / (Math.PI * 2/5) * this.screenWidth);
+                            const spriteWidth = sprite[0].length;
+                            const spriteHeight = sprite.length;
+                            
+                            const scale = Math.max(0.8, 15.0 / enemyDistance);
+                            const scaledWidth = Math.floor(spriteWidth * scale);
+                            const scaledHeight = Math.floor(spriteHeight * scale);
+                            
+                            const startX = enemyScreenX - Math.floor(scaledWidth / 2);
+                            const startY = Math.floor(this.screenHeight/2 - scaledHeight/2);
+                            
+                            for (let sy = 0; sy < scaledHeight; sy++) {
+                                const sourceY = Math.floor(sy / scale);
+                                if (sourceY < spriteHeight) {
+                                    for (let sx = 0; sx < scaledWidth; sx++) {
+                                        const sourceX = Math.floor(sx / scale);
+                                        if (sourceX < spriteWidth) {
+                                            const screenX = startX + sx;
+                                            const screenY = startY + sy;
+                                            
+                                            if (screenX >= 0 && screenX < this.screenWidth && 
+                                                screenY >= 0 && screenY < this.screenHeight) {
+                                                const char = sprite[sourceY][sourceX];
+                                                if (char !== ' ') {
+                                                    screen[screenY][screenX] = char;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Draw gun
+                this.drawGun(screen);
+                
+                return screen.map(row => row.join('')).join('\n');
+            }
+            
+            drawGun(screen) {
+                const gun = [
+                    "      ████████████████████      ",
+                    "     ██████████████████████     ",
+                    "    ████████████████████████    ",
+                    "   ██████████████████████████   ",
+                    "   ████              ████   ",
+                    "   ████  ████████████  ████   ",
+                    "   ████  ████████████  ████   ",
+                    "   ████  ████████████  ████   ",
+                    "   ████  ████████████  ████   ",
+                    "   ████████████████████████   ",
+                    "    ████████████████████████    ",
+                    "     ██████████████████████     ",
+                    "      ████████████████████      ",
+                    "       ██████████████████       ",
+                    "        ████████████████        ",
+                    "       ██████████████████       ",
+                    "      ████████████████████      ",
+                    "     ██████████████████████     ",
+                    "    ████████████████████████    ",
+                    "   ██████████████████████████   "
+                ];
+                
+                if (this.muzzleFlash > 0) {
+                    const flash = [
+                        "      ████████████████████      ",
+                        "    ████████████████████████    ",
+                        "  ██████████████████████████████  ",
+                        "████████████████████████████████████",
+                        "████████████████████████████████████",
+                        "  ██████████████████████████████  ",
+                        "    ████████████████████████    ",
+                        "      ████████████████████      "
+                    ];
+                    gun.splice(0, 0, ...flash);
+                }
+                
+                const gunWidth = 36;
+                const gunHeight = gun.length;
+                
+                const gunStartX = Math.floor(this.screenWidth / 2 - gunWidth / 2);
+                let gunStartY = this.screenHeight - gunHeight - Math.floor(this.gunKick);
+                
+                if (this.isReloading) {
+                    const reloadProgress = this.reloadTime / this.reloadDuration;
+                    const reloadOffset = Math.sin(reloadProgress * Math.PI * 4) * 8;
+                    gunStartY += Math.floor(reloadOffset);
+                }
+                
+                for (let gy = 0; gy < gunHeight; gy++) {
+                    const screenY = gunStartY + gy;
+                    if (screenY >= 0 && screenY < this.screenHeight) {
+                        for (let gx = 0; gx < gunWidth; gx++) {
+                            const screenX = gunStartX + gx;
+                            if (screenX >= 0 && screenX < this.screenWidth) {
+                                const gunChar = gun[gy][gx];
+                                if (gunChar !== ' ') {
+                                    screen[screenY][screenX] = gunChar;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Crosshair
+                const centerX = Math.floor(this.screenWidth / 2);
+                const centerY = Math.floor(this.screenHeight / 2);
+                
+                for (let i = -3; i <= 3; i++) {
+                    if (i !== 0 && centerX + i >= 0 && centerX + i < this.screenWidth) {
+                        screen[centerY][centerX + i] = '─';
+                    }
+                }
+                
+                for (let i = -3; i <= 3; i++) {
+                    if (i !== 0 && centerY + i >= 0 && centerY + i < this.screenHeight) {
+                        screen[centerY + i][centerX] = '│';
+                    }
+                }
+                
+                screen[centerY][centerX] = '◎';
+            }
+            
+            drawMinimap() {
+                let minimap = Array(16).fill().map(() => Array(20).fill(' '));
+                
+                for (let y = 0; y < this.mapHeight; y++) {
+                    for (let x = 0; x < this.mapWidth; x++) {
+                        minimap[y][x] = this.map[y][x] === '#' ? '█' : '.';
+                    }
+                }
+                
+                const px = Math.floor(this.playerX);
+                const py = Math.floor(this.playerY);
+                if (px >= 0 && px < this.mapWidth && py >= 0 && py < this.mapHeight) {
+                    minimap[py][px] = '@';
+                    
+                    const dirX = Math.floor(this.playerX + Math.cos(this.playerAngle) * 1.5);
+                    const dirY = Math.floor(this.playerY + Math.sin(this.playerAngle) * 1.5);
+                    if (dirX >= 0 && dirX < this.mapWidth && dirY >= 0 && dirY < this.mapHeight) {
+                        if (minimap[dirY][dirX] === '.') minimap[dirY][dirX] = '>';
+                    }
+                }
+                
+                for (let enemy of this.enemies) {
+                    if (enemy.alive) {
+                        const ex = Math.floor(enemy.x);
+                        const ey = Math.floor(enemy.y);
+                        if (ex >= 0 && ex < this.mapWidth && ey >= 0 && ey < this.mapHeight) {
+                            minimap[ey][ex] = '!';
+                        }
+                    }
+                }
+                
+                return minimap.map(row => row.join('')).join('\n');
+            }
+            
+            updateHealthBar() {
+                const healthPercent = (this.health / this.maxHealth) * 100;
+                const healthFill = document.getElementById('healthFill');
+                const healthText = document.getElementById('healthText');
+                
+                healthFill.style.width = healthPercent + '%';
+                healthText.textContent = Math.round(healthPercent) + '%';
+                
+                if (healthPercent > 60) {
+                    healthFill.style.background = '#0f0';
+                } else if (healthPercent > 30) {
+                    healthFill.style.background = '#ff0';
+                } else {
+                    healthFill.style.background = '#f00';
+                }
+            }
+            
+            render() {
+                const screen = this.raycast();
+                const minimap = this.drawMinimap();
+                
+                document.getElementById('screen').textContent = screen;
+                document.getElementById('minimap').textContent = minimap;
+                
+                this.updateHealthBar();
+                document.getElementById('ammo').textContent = `${this.ammo}/${this.maxAmmo}`;
+                document.getElementById('enemies').textContent = this.enemies.filter(e => e.alive).length;
+                
+                const reloadText = document.getElementById('reloadText');
+                if (this.isReloading) {
+                    const progress = Math.floor((this.reloadTime / this.reloadDuration) * 100);
+                    reloadText.textContent = `RELOADING... ${progress}%`;
+                } else if (this.ammo === 0) {
+                    reloadText.textContent = 'PRESS R TO RELOAD';
+                } else {
+                    reloadText.textContent = '';
+                }
+            }
+            
+            gameLoop() {
+                const now = Date.now();
+                const deltaTime = (now - (this.lastTime || now)) / 1000.0;
+                this.lastTime = now;
+                
+                this.update(deltaTime);
+                this.render();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+        
+        // Start with the title screen
+        window.addEventListener('load', () => {
+            new StartScreen();
+        });
+        
+        window.addEventListener('resize', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
